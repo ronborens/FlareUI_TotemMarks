@@ -527,54 +527,5 @@ function InRange.Debug()
     if ns.db then ns.db.debug = out end
     for _, line in ipairs(out) do print("|cff00ccffTotems:|r " .. line) end
 end
--- /flaretotemstest: with a mark missing, tries one remedy every four seconds and says which in chat;
--- the step after which the ants appear names the cause
-function InRange.Test()
-    local function say(text) print("|cffffff00>>> " .. text .. "|r") end
-    local function each(fn)
-        for _, mark in pairs(marks) do
-            if not mark.parked then
-                local ok, err = pcall(fn, mark)
-                if not ok then say("   (refused: " .. tostring(err) .. ")") end
-            end
-        end
-    end
-    local steps = {
-        { "STEP 1: asked the game to re-read your buffs", function(mark) mark.container:UpdateAllAuras() end },
-        { "STEP 2: restarted the animation", function(mark)
-            for art in pairs(mark.arts) do art.March:Stop() art.March:Play() end
-        end },
-        { "STEP 3: lowered the mark's layer", function(mark)
-            for art in pairs(mark.arts) do art:SetFrameLevel(4) end
-        end },
-        { "STEP 4: raised the mark's layer high", function(mark)
-            for art in pairs(mark.arts) do art:SetFrameStrata("HIGH") end
-        end },
-        { "STEP 5: pinned the mark straight onto the icon", function(mark)
-            for art in pairs(mark.arts) do
-                art:ClearAllPoints()
-                art:SetAllPoints(mark.seat.Icon)
-            end
-        end },
-        { "STEP 6: switched the mark off and on", function(mark)
-            mark.container:SetAuraGroupEnabled(MARK_GROUP, false)
-            mark.container:SetAuraGroupEnabled(MARK_GROUP, true)
-        end },
-        { "STEP 7: hid and showed the mark's holder", function(mark)
-            mark.container:Hide()
-            mark.container:Show()
-        end },
-    }
-    say("Test started. Watch the totem icon and note the LAST step shown when the ants appear.")
-    for i, step in ipairs(steps) do
-        C_Timer.After(4 * i, function()
-            each(step[2])
-            say(step[1])
-        end)
-    end
-    C_Timer.After(4 * (#steps + 1), function() say("Test finished.") end)
-end
 SLASH_FLARETOTEMSDEBUG1 = "/flaretotemsdebug"
 SlashCmdList["FLARETOTEMSDEBUG"] = function() InRange.Debug() end
-SLASH_FLARETOTEMSTEST1 = "/flaretotemstest"
-SlashCmdList["FLARETOTEMSTEST"] = function() InRange.Test() end
