@@ -141,8 +141,11 @@ end
 -- The ants on or off; art in a fight is left as it is (the option is a setting: changed out of one)
 local function StyleMark(art, on)
     if art.IsForbidden and art:IsForbidden() then return end
-    art.Ants:SetShown(on)
-    if on then art.March:Play() else art.March:Stop() end
+    -- (the texture can be forbidden while its frame is not)
+    pcall(function()
+        art.Ants:SetShown(on)
+        if on then art.March:Play() else art.March:Stop() end
+    end)
 end
 
 local markFailed = false
@@ -217,12 +220,26 @@ local function EditModeAlpha()
     coverHost:SetAlpha(manager and manager:IsShown() and 0 or 1)
 end
 
+-- The marks draw in the totem buttons' own layer of the screen (strata), or a higher one, never a
+-- lower: the buttons' layer changes as Blizzard and FlareUI hand the totem frame back and forth, and
+-- a mark left in a lower one is drawn underneath the icon, out of sight.
+local STRATA_RANK = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6,
+                      FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+local function RaiseHost(button)
+    if not coverHost then return end
+    local ok, strata = pcall(button.GetFrameStrata, button)
+    if not (ok and Readable(strata) and STRATA_RANK[strata]) then return end
+    local wanted = STRATA_RANK[strata] > STRATA_RANK.MEDIUM and strata or "MEDIUM"
+    if coverHost:GetFrameStrata() ~= wanted then pcall(coverHost.SetFrameStrata, coverHost, wanted) end
+end
+
 local function BuildMarks(learned)
     if markFailed or InCombatLockdown() then return end
     if not coverHost then
         local holder = _G.FlareUI_Totems or UIParent
         coverHost = CreateFrame("Frame", nil, holder)
         coverHost:SetAllPoints(holder)
+        coverHost:SetFrameStrata("MEDIUM")
         local manager = _G.EditModeManagerFrame
         if manager then
             manager:HookScript("OnShow", EditModeAlpha)
@@ -374,6 +391,7 @@ UpdateRange = function()
                 if ok then
                     markLevel = button:GetFrameLevel()
                     mark.used = true
+                    RaiseHost(button)
                 else
                     mark.seat = nil
                     LogSeat("seat failed: " .. tostring(err))
@@ -492,8 +510,10 @@ function InRange.Debug()
     if frame and frame.totemPool then
         for button in frame.totemPool:EnumerateActive() do
             local tex = button.Icon and button.Icon.Texture
-            add(("button: slot=%s seen=%s texture=%s level=%s"):format(show(button.slot), show(tex and TotemOn(button, tex)),
-                show(tex and tex.GetTextureFileID and tex:GetTextureFileID()), show(button:GetFrameLevel())))
+            add(("button: slot=%s seen=%s texture=%s level=%s strata=%s iconLevel=%s parent=%s hostStrata=%s"):format(show(button.slot),
+                show(tex and TotemOn(button, tex)), show(tex and tex.GetTextureFileID and tex:GetTextureFileID()),
+                show(button:GetFrameLevel()), show(button:GetFrameStrata()), show(button.Icon and button.Icon:GetFrameLevel()),
+                show(frame:GetParent() and frame:GetParent():GetName()), show(coverHost and coverHost:GetFrameStrata())))
         end
     end
     for _, button in ipairs(BarButtons()) do
@@ -507,5 +527,54 @@ function InRange.Debug()
     if ns.db then ns.db.debug = out end
     for _, line in ipairs(out) do print("|cff00ccffTotems:|r " .. line) end
 end
+-- /flaretotemstest: with a mark missing, tries one remedy every four seconds and says which in chat;
+-- the step after which the ants appear names the cause
+function InRange.Test()
+    local function say(text) print("|cffffff00>>> " .. text .. "|r") end
+    local function each(fn)
+        for _, mark in pairs(marks) do
+            if not mark.parked then
+                local ok, err = pcall(fn, mark)
+                if not ok then say("   (refused: " .. tostring(err) .. ")") end
+            end
+        end
+    end
+    local steps = {
+        { "STEP 1: asked the game to re-read your buffs", function(mark) mark.container:UpdateAllAuras() end },
+        { "STEP 2: restarted the animation", function(mark)
+            for art in pairs(mark.arts) do art.March:Stop() art.March:Play() end
+        end },
+        { "STEP 3: lowered the mark's layer", function(mark)
+            for art in pairs(mark.arts) do art:SetFrameLevel(4) end
+        end },
+        { "STEP 4: raised the mark's layer high", function(mark)
+            for art in pairs(mark.arts) do art:SetFrameStrata("HIGH") end
+        end },
+        { "STEP 5: pinned the mark straight onto the icon", function(mark)
+            for art in pairs(mark.arts) do
+                art:ClearAllPoints()
+                art:SetAllPoints(mark.seat.Icon)
+            end
+        end },
+        { "STEP 6: switched the mark off and on", function(mark)
+            mark.container:SetAuraGroupEnabled(MARK_GROUP, false)
+            mark.container:SetAuraGroupEnabled(MARK_GROUP, true)
+        end },
+        { "STEP 7: hid and showed the mark's holder", function(mark)
+            mark.container:Hide()
+            mark.container:Show()
+        end },
+    }
+    say("Test started. Watch the totem icon and note the LAST step shown when the ants appear.")
+    for i, step in ipairs(steps) do
+        C_Timer.After(4 * i, function()
+            each(step[2])
+            say(step[1])
+        end)
+    end
+    C_Timer.After(4 * (#steps + 1), function() say("Test finished.") end)
+end
 SLASH_FLARETOTEMSDEBUG1 = "/flaretotemsdebug"
 SlashCmdList["FLARETOTEMSDEBUG"] = function() InRange.Debug() end
+SLASH_FLARETOTEMSTEST1 = "/flaretotemstest"
+SlashCmdList["FLARETOTEMSTEST"] = function() InRange.Test() end
