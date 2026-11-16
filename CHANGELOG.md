@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- No changes in game. Releases are now built and uploaded automatically.
+
 ## 1.0.0
 
 - First release: totem icons on nameplates, and the In Range Mark on totems, the totem bar and action bars.
