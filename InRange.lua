@@ -280,19 +280,22 @@ end
 
 -- The icon of the totem on a button: GetTotemInfo by its slot, which is the truth whenever it can be
 -- read (a totem with no icon there has none: the button's texture is then a leftover from the totem
--- it showed before, the buttons being reused). In a fight it can't be read, and the icon the button
--- shows is taken, but only when that totem belongs in the button's slot.
+-- it showed before, the buttons being reused). In a fight it can't be read; the icon the button shows
+-- is taken when that can be read and the totem belongs in the button's slot. A totem dropped in a
+-- fight can't be told at all (its icon is secret too): the second result says so.
 local function TotemOn(button, tex)
     local slot = button.slot
-    if not (Readable(slot) and type(slot) == "number") then return nil end
+    if not (Readable(slot) and type(slot) == "number") then return nil, false end
     local ok, have, _, _, _, icon = pcall(GetTotemInfo, slot)
     if ok and Readable(have) and Readable(icon) then
-        return have and icon or nil
+        return have and icon or nil, false
     end
     local shown = tex.GetTextureFileID and tex:GetTextureFileID()
-    if not (Readable(shown) and shown) then return nil end
-    local home = Slots()[shown]   -- (a totem whose slot was never noted is taken on trust)
-    if home == nil or home == slot then return shown end
+    if Readable(shown) and shown then
+        local home = Slots()[shown]   -- (a totem whose slot was never noted is taken on trust)
+        if home == nil or home == slot then return shown, false end
+    end
+    return nil, true
 end
 
 -- THE BARS. An action button holding a learned totem's spell (the totem's icon is its spell's) gets a
@@ -389,16 +392,9 @@ UpdateRange = function()
     if learned and frame and frame.totemPool then
         for button in frame.totemPool:EnumerateActive() do
             local tex = button.Icon and button.Icon.Texture
-            local icon = tex and TotemOn(button, tex)
-            local mark = icon and marks[icon]
-            if not calm then
-                local okTex, texture = pcall(function() return tex:GetTextureFileID() end)
-                LogSeat(("in combat: button slot=%s texture=%s taken as=%s mark=%s same seat=%s"):format(
-                    Readable(button.slot) and tostring(button.slot) or "<secret>",
-                    okTex and Readable(texture) and tostring(texture) or "<secret>", tostring(icon), tostring(mark ~= nil),
-                    tostring(mark and mark.seat == button)))
-            end
-            if mark then
+            local icon, untold
+            if tex then icon, untold = TotemOn(button, tex) end
+            local function Seat(mark)
                 local ok, err = pcall(SeatMark, mark, button)
                 if ok then
                     markLevel = button:GetFrameLevel()
@@ -407,6 +403,17 @@ UpdateRange = function()
                 else
                     mark.seat = nil
                     LogSeat("seat failed: " .. tostring(err))
+                end
+            end
+            if icon and marks[icon] then
+                Seat(marks[icon])
+            elseif untold then
+                -- A totem dropped in a fight: which one can't be read, but its slot (element) can, and
+                -- only one totem stands in a slot. Every learned totem of that slot is seated here; the
+                -- game shows only the mark whose buff is on you.
+                local slot, slots = button.slot, Slots()
+                for learnedIcon, mark in pairs(marks) do
+                    if slots[learnedIcon] == slot then Seat(mark) end
                 end
             end
         end
