@@ -23,12 +23,14 @@ ns.InRange = InRange
 local MEDIA = "Interface\\AddOns\\FlareUI_TotemMarks\\Media\\"
 local MAX = _G.MAX_TOTEMS or 4
 local MARK_YELLOW = { 1, 0.85, 0.1 }
--- Marching Ants: dashes round a circle, turned; and 4 x 4 frames of dashes round a square, each a step
--- on, played as a flipbook
+-- Marching Ants (tools/auraart.js): 4 x 4 frames of dashes round a circle, and round a square, each
+-- frame a step on, played as a flipbook. (The ring was first one picture turned by a Rotation
+-- animation: a turning texture keeps the place it had when the turning began, so a mark moved onto
+-- another totem button was drawn where it used to be.)
 local ANTS_RING, ANTS_SQUARE = MEDIA .. "AntsRing", MEDIA .. "AntsSquare"
 local ANTS_GRID = 4
-local ANTS_TURN = 8      -- seconds a turn of the ring
-local ANTS_STEP = 0.5    -- seconds the square's dashes take to move on by one dash and gap
+local ANTS_STEP_RING = 0.67   -- seconds the ring's dashes take to move on by one dash and gap
+local ANTS_STEP = 0.5         -- the same for the square's
 local MARK_GROUP = "buff"
 local LEVEL_MARK = 4     -- over a totem button: above the swipe, under the time
 local BAR_PREFIXES = {
@@ -116,9 +118,8 @@ local function IDKey(ids)
 end
 
 -- The mark's art on a frame, in the frame's shape (round on a totem, square on an action button). The
--- ants march by the texture's own animation, so nothing runs in Lua: the round ones turn, the square
--- ones play a flipbook of dashes a step further round the square each frame (a client without
--- flipbooks shows them standing).
+-- ants march by the texture's own animation, so nothing runs in Lua: a flipbook of dashes a step
+-- further round the shape each frame (a client without flipbooks shows them standing).
 local function MakeMark(art, round)
     art.Ants = art:CreateTexture(nil, "OVERLAY")
     art.Ants:SetTexture(round and ANTS_RING or ANTS_SQUARE)
@@ -126,19 +127,13 @@ local function MakeMark(art, round)
     art.Ants:SetAllPoints(art)
     art.March = art.Ants:CreateAnimationGroup()
     art.March:SetLooping("REPEAT")
-    if round then
-        local turn = art.March:CreateAnimation("Rotation")
-        turn:SetDegrees(-360)   -- clockwise
-        turn:SetDuration(ANTS_TURN)
-    else
-        art.Ants:SetTexCoord(0, 1 / ANTS_GRID, 0, 1 / ANTS_GRID)   -- the first frame
-        local ok, flip = pcall(art.March.CreateAnimation, art.March, "FlipBook")
-        if ok and flip then
-            flip:SetDuration(ANTS_STEP)
-            pcall(flip.SetFlipBookRows, flip, ANTS_GRID)
-            pcall(flip.SetFlipBookColumns, flip, ANTS_GRID)
-            pcall(flip.SetFlipBookFrames, flip, ANTS_GRID * ANTS_GRID)
-        end
+    art.Ants:SetTexCoord(0, 1 / ANTS_GRID, 0, 1 / ANTS_GRID)   -- the first frame
+    local ok, flip = pcall(art.March.CreateAnimation, art.March, "FlipBook")
+    if ok and flip then
+        flip:SetDuration(round and ANTS_STEP_RING or ANTS_STEP)
+        pcall(flip.SetFlipBookRows, flip, ANTS_GRID)
+        pcall(flip.SetFlipBookColumns, flip, ANTS_GRID)
+        pcall(flip.SetFlipBookFrames, flip, ANTS_GRID * ANTS_GRID)
     end
     return art
 end
@@ -189,18 +184,30 @@ end
 local marks = {}       -- marks[icon]
 local markLevel = 0    -- a totem button's frame level, for art made later
 
+local seatLog = {}   -- the last moves, for /flaretotemsdebug
+local function LogSeat(text)
+    seatLog[#seatLog + 1] = ("%.2f %s"):format(GetTime(), text)
+    if #seatLog > 14 then table.remove(seatLog, 1) end
+end
+
 local function ParkMark(mark)
     if mark.parked then return end
     mark.parked = true
+    mark.seat = nil
     mark.spot:ClearAllPoints()
     mark.spot:SetPoint("BOTTOMRIGHT", UIParent, "TOPLEFT", -50, 50)
     mark.spot:SetSize(1, 1)
+    LogSeat("park")
 end
 
+-- (a spot already on this button is left alone: nothing is moved that doesn't have to be)
 local function SeatMark(mark, button)
+    if mark.seat == button and not mark.parked then return end
     mark.parked = false
+    mark.seat = button
     mark.spot:ClearAllPoints()
     mark.spot:SetAllPoints(button.Icon)
+    LogSeat("seat slot " .. tostring(button.slot) .. " points " .. tostring(mark.spot:GetNumPoints()))
 end
 
 -- Edit Mode shows FlareUI's sample totems: the marks step aside with the live totems
@@ -362,9 +369,15 @@ UpdateRange = function()
             local tex = button.Icon and button.Icon.Texture
             local icon = tex and TotemOn(button, tex)
             local mark = icon and marks[icon]
-            if mark and pcall(SeatMark, mark, button) then
-                markLevel = button:GetFrameLevel()
-                mark.used = true
+            if mark then
+                local ok, err = pcall(SeatMark, mark, button)
+                if ok then
+                    markLevel = button:GetFrameLevel()
+                    mark.used = true
+                else
+                    mark.seat = nil
+                    LogSeat("seat failed: " .. tostring(err))
+                end
             end
         end
     end
@@ -444,7 +457,36 @@ function InRange.Debug()
         local arts = 0
         for _ in pairs(mark.arts) do arts = arts + 1 end
         add(("mark %s: sig=%s parked=%s used=%s arts=%d"):format(show(icon), show(mark.sig), show(mark.parked), show(mark.used), arts))
+        local function rect(region)
+            local ok, l, b, w, h = pcall(region.GetRect, region)
+            if not ok then return "error" end
+            return ("%s,%s %sx%s"):format(show(l and math.floor(l)), show(b and math.floor(b)), show(w and math.floor(w)), show(h and math.floor(h)))
+        end
+        local spot = mark.spot
+        local okPoint, _, relativeTo = pcall(spot.GetPoint, spot, 1)
+        add(("  spot: points=%s rect=%s onSeatIcon=%s seatIconRect=%s shown=%s visible=%s strata=%s"):format(show(spot:GetNumPoints()),
+            rect(spot), show(okPoint and mark.seat and relativeTo == mark.seat.Icon), mark.seat and rect(mark.seat.Icon) or "none",
+            show(spot:IsShown()), show(spot:IsVisible()), show(spot:GetFrameStrata())))
+        local container = mark.container
+        add(("  container: shown=%s visible=%s"):format(show(container:IsShown()), show(container:IsVisible())))
+        local n = 0
+        for art in pairs(mark.arts) do
+            n = n + 1
+            if art:IsForbidden() then
+                add("  art " .. n .. ": forbidden")
+            else
+                local parent = art:GetParent()
+                local okVis, vis = pcall(art.IsVisible, art)
+                local okPar, parVis = pcall(parent.IsShown, parent)
+                add(("  art %d: shown=%s visible=%s parentShown=%s rect=%s level=%s strata=%s ants=%s playing=%s alpha=%s"):format(n,
+                    show(art:IsShown()), okVis and show(vis) or "error", okPar and show(parVis) or "error", rect(art),
+                    show(art:GetFrameLevel()), show(art:GetFrameStrata()), show(art.Ants:IsShown()), show(art.March:IsPlaying()),
+                    show(art:GetEffectiveAlpha())))
+            end
+        end
     end
+    for _, line in ipairs(seatLog) do add("  log " .. line) end
+    add("now " .. ("%.2f"):format(GetTime()))
     local frame = _G.TotemFrame
     add(("totemFrame=%s pool=%s shown=%s"):format(show(frame ~= nil), show(frame and frame.totemPool ~= nil), show(frame and frame:IsShown())))
     if frame and frame.totemPool then
