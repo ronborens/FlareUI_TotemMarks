@@ -41,8 +41,14 @@ local UpdateRange
 
 local function Readable(v) return canaccessvalue == nil or canaccessvalue(v) end
 
+-- Shamans only: no other class has totems of its own to mark, and nothing here runs for them
+local isShaman
 local function MarkOn()
-    return ns.db and ns.db.inRange == true or false
+    if isShaman == nil then
+        local _, class = UnitClass("player")
+        if class then isShaman = class == "SHAMAN" end
+    end
+    return isShaman and ns.db and ns.db.inRange == true or false
 end
 
 local function BarsOn()

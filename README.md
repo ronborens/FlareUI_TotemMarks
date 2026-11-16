@@ -4,7 +4,7 @@ Two helpers for anyone who plays with or against totems.
 
 **Totem Icons on Nameplates.** Each totem's nameplate shows the totem's icon, either above the plate or instead of it, so you can tell at a glance which totem is which.
 
-**In Range Mark.** Yellow dashes march round a totem's icon while its buff is on you, and stop when you walk out of its range. The mark shows on FlareUI's totem icons, on the totem bar and on the totem's spell wherever it sits on your action bars. Works in combat.
+**In Range Mark (shamans).** Yellow dashes march round a totem's icon while its buff is on you, and stop when you walk out of its range. The mark shows on FlareUI's totem icons, on the totem bar and on the totem's spell wherever it sits on your action bars. Works in combat.
 
 ## Options
 
@@ -16,6 +16,7 @@ The options appear inside FlareUI's own settings window. You can also type `/fla
 
 ## Good to know
 
+- The In Range Mark does nothing at all on other classes, so it costs them nothing.
 - A totem is learned the first time you stand in its buff out of combat. Until then it has no mark.
 - Totems with no buff of their own, such as Searing or Tremor, are never marked.
 - In a group, another shaman's totem of the same kind lights the mark too, because the buff is the same.
