@@ -23,6 +23,18 @@ The options appear inside FlareUI's own settings window. You can also type `/fla
 - Your own and your group's totems show nameplate icons only with friendly nameplates switched on.
 - Nameplate icons stand down while another nameplate addon draws the plates.
 
+## Install
+
+1. Download the latest zip from this project's [Releases](https://github.com/ronborens/FlareUI_TotemMarks/releases).
+2. Extract it into your game's `Interface/AddOns` folder, so that `FlareUI_TotemMarks` sits beside `FlareUI`.
+3. Restart the game.
+
+To run it straight from the source, clone this repository into `Interface/AddOns` as `FlareUI_TotemMarks`.
+
+## Problems and ideas
+
+Please open an [issue](https://github.com/ronborens/FlareUI_TotemMarks/issues) and say which FlareUI version you have. For a problem with the In Range Mark, type `/flaretotemsdebug` while it is happening and include the lines it prints.
+
 ## Requirements
 
 - [FlareUI](https://www.curseforge.com/wow/addons/flareui) must be installed and enabled.
