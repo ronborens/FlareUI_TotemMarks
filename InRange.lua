@@ -190,7 +190,7 @@ local markLevel = 0    -- a totem button's frame level, for art made later
 local seatLog = {}   -- the last moves, for /flaretotemsdebug
 local function LogSeat(text)
     seatLog[#seatLog + 1] = ("%.2f %s"):format(GetTime(), text)
-    if #seatLog > 14 then table.remove(seatLog, 1) end
+    if #seatLog > 40 then table.remove(seatLog, 1) end
 end
 
 local function ParkMark(mark)
@@ -210,7 +210,10 @@ local function SeatMark(mark, button)
     mark.seat = button
     mark.spot:ClearAllPoints()
     mark.spot:SetAllPoints(button.Icon)
-    LogSeat("seat slot " .. tostring(button.slot) .. " points " .. tostring(mark.spot:GetNumPoints()))
+    local okRect, left, bottom, width = pcall(mark.spot.GetRect, mark.spot)
+    LogSeat(("seat slot %s points %s rect %s,%s w%s combat=%s"):format(tostring(button.slot), tostring(mark.spot:GetNumPoints()),
+        okRect and left and math.floor(left) or "?", okRect and bottom and math.floor(bottom) or "?",
+        okRect and width and math.floor(width) or "?", tostring(InCombatLockdown())))
 end
 
 -- Edit Mode shows FlareUI's sample totems: the marks step aside with the live totems
@@ -287,7 +290,9 @@ local function TotemOn(button, tex)
         return have and icon or nil
     end
     local shown = tex.GetTextureFileID and tex:GetTextureFileID()
-    if Readable(shown) and shown and Slots()[shown] == slot then return shown end
+    if not (Readable(shown) and shown) then return nil end
+    local home = Slots()[shown]   -- (a totem whose slot was never noted is taken on trust)
+    if home == nil or home == slot then return shown end
 end
 
 -- THE BARS. An action button holding a learned totem's spell (the totem's icon is its spell's) gets a
@@ -386,6 +391,13 @@ UpdateRange = function()
             local tex = button.Icon and button.Icon.Texture
             local icon = tex and TotemOn(button, tex)
             local mark = icon and marks[icon]
+            if not calm then
+                local okTex, texture = pcall(function() return tex:GetTextureFileID() end)
+                LogSeat(("in combat: button slot=%s texture=%s taken as=%s mark=%s same seat=%s"):format(
+                    Readable(button.slot) and tostring(button.slot) or "<secret>",
+                    okTex and Readable(texture) and tostring(texture) or "<secret>", tostring(icon), tostring(mark ~= nil),
+                    tostring(mark and mark.seat == button)))
+            end
             if mark then
                 local ok, err = pcall(SeatMark, mark, button)
                 if ok then
@@ -426,6 +438,9 @@ end
 
 -- Your buffs changing only matter when they teach a totem's buff (never in a fight)
 rangeEvents:SetScript("OnEvent", function(_, event)
+    if event == "PLAYER_TOTEM_UPDATE" or event == "PLAYER_REGEN_ENABLED" then
+        LogSeat("event " .. event .. " combat=" .. tostring(InCombatLockdown()))
+    end
     if event == "UNIT_AURA" and not Learn() then return end
     Schedule()
 end)
@@ -486,12 +501,15 @@ function InRange.Debug()
             rect(spot), show(okPoint and mark.seat and relativeTo == mark.seat.Icon), mark.seat and rect(mark.seat.Icon) or "none",
             show(spot:IsShown()), show(spot:IsVisible()), show(spot:GetFrameStrata())))
         local container = mark.container
-        add(("  container: shown=%s visible=%s"):format(show(container:IsShown()), show(container:IsVisible())))
+        local okCon, conShown = pcall(container.IsShown, container)
+        add(("  container: forbidden=%s shown=%s"):format(show(container:IsForbidden()), okCon and show(conShown) or "error"))
         local n = 0
         for art in pairs(mark.arts) do
             n = n + 1
-            if art:IsForbidden() then
-                add("  art " .. n .. ": forbidden")
+            if n > 2 then
+                -- (the rest are the same)
+            elseif art:IsForbidden() or InCombatLockdown() then
+                add("  art " .. n .. ": forbidden=" .. show(art:IsForbidden()) .. " (in combat)")
             else
                 local parent = art:GetParent()
                 local okVis, vis = pcall(art.IsVisible, art)
