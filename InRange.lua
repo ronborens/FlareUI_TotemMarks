@@ -389,3 +389,60 @@ function InRange.Refresh()
     end
     UpdateRange()
 end
+
+-- /flaretotemsdebug: what the In Range Mark sees right now, printed and saved (for bug reports)
+function InRange.Debug()
+    local out = {}
+    local function add(text) out[#out + 1] = text end
+    local function show(v)
+        if v == nil then return "nil" end
+        if not Readable(v) then return "<secret>" end
+        return tostring(v)
+    end
+    local _, class = UnitClass("player")
+    add(("class=%s on=%s bars=%s listening=%s combat=%s locked=%s failed=%s"):format(show(class), show(MarkOn()),
+        show(BarsOn()), show(listening), show(InCombatLockdown()), show(AurasLocked()), show(markFailed)))
+    local holder = _G.FlareUI_Totems
+    add(("holder=%s holderShown=%s host=%s hostParentIsHolder=%s hostAlpha=%s"):format(show(holder ~= nil),
+        show(holder and holder:IsShown()), show(coverHost ~= nil), show(coverHost and coverHost:GetParent() == holder),
+        show(coverHost and coverHost:GetAlpha())))
+    for slot = 1, MAX do
+        local ok, have, name, _, _, icon = pcall(GetTotemInfo, slot)
+        add(("totem %d: ok=%s have=%s name=%s icon=%s"):format(slot, show(ok), show(have), show(name), show(icon)))
+    end
+    for i = 1, 40 do
+        local ok, aura = pcall(C_UnitAuras.GetAuraDataByIndex, "player", i, "HELPFUL")
+        if not ok then add("buff " .. i .. ": error " .. show(aura)) break end
+        if not Readable(aura) then add("buff " .. i .. ": <secret>") break end
+        if not aura then break end
+        add(("buff %d: name=%s icon=%s id=%s"):format(i, show(aura.name), show(aura.icon), show(aura.spellId)))
+    end
+    for icon, ids in pairs(Learned() or {}) do
+        add(("learned %s: %s"):format(show(icon), type(ids) == "table" and IDKey(ids) or show(ids)))
+    end
+    for icon, mark in pairs(marks) do
+        local arts = 0
+        for _ in pairs(mark.arts) do arts = arts + 1 end
+        add(("mark %s: sig=%s parked=%s used=%s arts=%d"):format(show(icon), show(mark.sig), show(mark.parked), show(mark.used), arts))
+    end
+    local frame = _G.TotemFrame
+    add(("totemFrame=%s pool=%s shown=%s"):format(show(frame ~= nil), show(frame and frame.totemPool ~= nil), show(frame and frame:IsShown())))
+    if frame and frame.totemPool then
+        for button in frame.totemPool:EnumerateActive() do
+            local tex = button.Icon and button.Icon.Texture
+            add(("button: slot=%s seen=%s level=%s"):format(show(button.slot), show(tex and TotemOn(button, tex)), show(button:GetFrameLevel())))
+        end
+    end
+    for _, button in ipairs(BarButtons()) do
+        local icon = BarSpellIcon(button)
+        local learned = Learned()
+        if icon and learned and learned[icon] then
+            local mark = button.FlareUIExt_TotemMark
+            add(("bar %s: icon=%s mark=%s sig=%s"):format(show(button:GetName()), show(icon), show(mark ~= nil), show(mark and mark.sig)))
+        end
+    end
+    if ns.db then ns.db.debug = out end
+    for _, line in ipairs(out) do print("|cff00ccffTotems:|r " .. line) end
+end
+SLASH_FLARETOTEMSDEBUG1 = "/flaretotemsdebug"
+SlashCmdList["FLARETOTEMSDEBUG"] = function() InRange.Debug() end
