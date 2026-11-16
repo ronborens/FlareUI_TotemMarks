@@ -3,7 +3,7 @@ local _, ns = ...
 --------------------------------------------------
 -- TOTEM ICONS & IN RANGE MARK (an extension for FlareUI): settings and start-up
 --------------------------------------------------
-local DEFAULTS = { inRange = true, inRangeBars = true, nameplates = "above", totemBuffs = {} }
+local DEFAULTS = { inRange = true, inRangeBars = true, nameplates = "above", totemBuffs = {}, totemSlots = {} }
 
 local started = false
 local function Refresh()

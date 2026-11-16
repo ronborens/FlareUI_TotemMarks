@@ -68,17 +68,27 @@ local function Learned()
     return ns.db.totemBuffs
 end
 
+-- icon -> the slot (element) its totem stands in, noted out of a fight: in one the totems can't be
+-- read, and a totem button is then only trusted to show an icon that belongs in its slot
+local function Slots()
+    if not ns.db then return {} end
+    if type(ns.db.totemSlots) ~= "table" then ns.db.totemSlots = {} end
+    return ns.db.totemSlots
+end
+
 -- Out of a fight: the buffs on you that share a standing totem's icon are that totem's
 local function Learn()
     if InCombatLockdown() or AurasLocked() then return end
     local learned = Learned()
     if not learned then return end
     local icons
+    local slots = Slots()
     for slot = 1, MAX do
         local ok, have, _, _, _, icon = pcall(GetTotemInfo, slot)
         if ok and Readable(have) and have and Readable(icon) and icon then
             icons = icons or {}
             icons[icon] = true
+            slots[icon] = slot
         end
     end
     if not icons then return end
@@ -219,8 +229,11 @@ local function BuildMarks(learned)
         if key and not mark then
             mark = { arts = setmetatable({}, { __mode = "k" }), spot = CreateFrame("Frame", nil, coverHost) }
             ParkMark(mark)
+            local made = setmetatable({}, { __mode = "k" })   -- the game can set a button up again
             mark.container = MarkContainer(coverHost, ids, function(auraButton)
+                if made[auraButton] then return end
                 local art = CreateFrame("Frame", nil, auraButton)
+                made[auraButton] = art
                 art:SetAllPoints(mark.spot)
                 art:SetFrameLevel(markLevel + LEVEL_MARK)
                 StyleMark(MakeMark(art, true), MarkOn())
@@ -238,15 +251,19 @@ local function BuildMarks(learned)
     end
 end
 
--- The icon of the totem on a button: GetTotemInfo by its slot; failing that, the icon it shows
+-- The icon of the totem on a button: GetTotemInfo by its slot, which is the truth whenever it can be
+-- read (a totem with no icon there has none: the button's texture is then a leftover from the totem
+-- it showed before, the buttons being reused). In a fight it can't be read, and the icon the button
+-- shows is taken, but only when that totem belongs in the button's slot.
 local function TotemOn(button, tex)
     local slot = button.slot
-    if Readable(slot) and type(slot) == "number" then
-        local ok, have, _, _, _, icon = pcall(GetTotemInfo, slot)
-        if ok and Readable(have) and have and Readable(icon) and icon then return icon end
+    if not (Readable(slot) and type(slot) == "number") then return nil end
+    local ok, have, _, _, _, icon = pcall(GetTotemInfo, slot)
+    if ok and Readable(have) and Readable(icon) then
+        return have and icon or nil
     end
     local shown = tex.GetTextureFileID and tex:GetTextureFileID()
-    if Readable(shown) and shown then return shown end
+    if Readable(shown) and shown and Slots()[shown] == slot then return shown end
 end
 
 -- THE BARS. An action button holding a learned totem's spell (the totem's icon is its spell's) gets a
@@ -290,8 +307,11 @@ local function SyncBarMark(button, learned, on)
     end
     if not mark then
         mark = { arts = setmetatable({}, { __mode = "k" }) }
+        local made = setmetatable({}, { __mode = "k" })   -- the game can set a button up again
         mark.container = MarkContainer(button, ids, function(auraButton)
+            if made[auraButton] then return end
             local art = CreateFrame("Frame", nil, auraButton)
+            made[auraButton] = art
             art:SetAllPoints(button.icon or button)
             art:SetFrameLevel(button:GetFrameLevel() + LEVEL_MARK)
             StyleMark(MakeMark(art, false), MarkOn())
@@ -418,7 +438,7 @@ function InRange.Debug()
         add(("buff %d: name=%s icon=%s id=%s"):format(i, show(aura.name), show(aura.icon), show(aura.spellId)))
     end
     for icon, ids in pairs(Learned() or {}) do
-        add(("learned %s: %s"):format(show(icon), type(ids) == "table" and IDKey(ids) or show(ids)))
+        add(("learned %s: %s slot=%s"):format(show(icon), type(ids) == "table" and IDKey(ids) or show(ids), show(Slots()[icon])))
     end
     for icon, mark in pairs(marks) do
         local arts = 0
@@ -430,7 +450,8 @@ function InRange.Debug()
     if frame and frame.totemPool then
         for button in frame.totemPool:EnumerateActive() do
             local tex = button.Icon and button.Icon.Texture
-            add(("button: slot=%s seen=%s level=%s"):format(show(button.slot), show(tex and TotemOn(button, tex)), show(button:GetFrameLevel())))
+            add(("button: slot=%s seen=%s texture=%s level=%s"):format(show(button.slot), show(tex and TotemOn(button, tex)),
+                show(tex and tex.GetTextureFileID and tex:GetTextureFileID()), show(button:GetFrameLevel())))
         end
     end
     for _, button in ipairs(BarButtons()) do
