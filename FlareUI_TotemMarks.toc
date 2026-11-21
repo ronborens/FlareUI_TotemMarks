@@ -2,7 +2,7 @@
 ## Title: FlareUI: Totem Icons & In Range Mark
 ## Notes: Unofficial FlareUI extension. Totem icons on nameplates, and a mark on each totem whose buff is on you.
 ## Author: ronborens
-## Version: 1.0.2
+## Version: 1.0.3
 ## Dependencies: FlareUI
 ## Group: FlareUI
 ## SavedVariables: FlareUI_TotemMarksDB

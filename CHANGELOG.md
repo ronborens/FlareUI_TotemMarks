@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- The options now stay visible in FlareUI's settings when a FlareUI update moves or removes the tab they sit on.
+
 ## 1.0.2
 
 - Fixed an error that could appear just after a fight, while the game still had the In Range Mark locked.
