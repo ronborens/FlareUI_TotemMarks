@@ -422,7 +422,8 @@ UpdateRange = function()
         if not mark.used then pcall(ParkMark, mark) end
         for art in pairs(mark.arts) do
             StyleMark(art, on)
-            if calm and not art:IsForbidden() then art:SetFrameLevel(markLevel + LEVEL_MARK) end
+            -- (art can be forbidden out of a fight too, while auras are still secret)
+            if calm and not art:IsForbidden() then pcall(art.SetFrameLevel, art, markLevel + LEVEL_MARK) end
         end
     end
     -- the bars
