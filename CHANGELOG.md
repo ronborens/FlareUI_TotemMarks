@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+- Fixed an error that could appear just after a fight, while the game still had the In Range Mark locked.
+
 ## 1.0.1
 
 - No changes in game. Releases are now built and uploaded automatically.
