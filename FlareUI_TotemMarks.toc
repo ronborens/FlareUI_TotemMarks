@@ -1,10 +1,9 @@
 ## Interface: 16001
-## Title: FlareUI: Totem Icons & In Range Mark
-## Notes: Unofficial FlareUI extension. Totem icons on nameplates, and a mark on each totem whose buff is on you.
+## Title: Totem Icons & In Range Mark for FlareUI
+## Notes: Unofficial add-on for FlareUI, not made by its author. Totem icons on nameplates, and a mark on each totem whose buff is on you.
 ## Author: ronborens
-## Version: 1.0.3
+## Version: 1.0.4
 ## Dependencies: FlareUI
-## Group: FlareUI
 ## SavedVariables: FlareUI_TotemMarksDB
 ## Category: User Interface
 ## X-License: MIT

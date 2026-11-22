@@ -1,6 +1,8 @@
-# FlareUI: Totem Icons & In Range Mark
+# Totem Icons & In Range Mark for FlareUI
 
-An extension for the FlareUI interface with two features for anyone who plays with or against totems: icons on totem nameplates so you can tell totems apart, and a moving mark that tells a shaman whether they are still standing in range of their own totems.
+An unofficial add-on for FlareUI with two features for anyone who plays with or against totems: icons on totem nameplates so you can tell totems apart, and a moving mark that tells a shaman whether they are still standing in range of their own totems.
+
+_Not made by, or affiliated with, FlareUI's author._
 
 ## Feature 1: Totem Icons on Nameplates
 

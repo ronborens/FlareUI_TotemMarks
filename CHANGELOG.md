@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- Renamed to Totem Icons & In Range Mark for FlareUI, to make clear it is an unofficial add-on and not part of FlareUI. Nothing else changes.
+
 ## 1.0.3
 
 - The options now stay visible in FlareUI's settings when a FlareUI update moves or removes the tab they sit on.
